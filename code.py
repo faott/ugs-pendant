@@ -6,7 +6,7 @@ from adafruit_hid.keyboard import Keyboard
 from adafruit_hid.keyboard_layout_us import KeyboardLayoutUS
 from adafruit_hid.keycode import Keycode
 
-# Set up Keybow
+# Set up Keypad
 keypad = PMK(Hardware())
 keys = keypad.keys
 
@@ -15,8 +15,9 @@ keyboard = Keyboard(usb_hid.devices)
 layout = KeyboardLayoutUS(keyboard)
 
 
-# A map of keycodes that will be mapped sequentially to each of the keys, 0-15
-keymap =    [
+# The regular map of keycodes that will be mapped sequentially to each of the keys, 0-15
+# If calling multiple keystrockes, put each sequence as a list in a list
+n_keymap =    [
              [Keycode.THREE],           # Button C
 
              [Keycode.ONE, Keycode.T],  # Button 8
@@ -39,7 +40,7 @@ keymap =    [
 
              [Keycode.NINE],          # Button A
 
-             [Keycode.A],             # Button 6
+             [Keycode.B],             # Button 6
 
              [[Keycode.LEFT_CONTROL, Keycode.LEFT_ALT, Keycode.L],
              [Keycode.LEFT_CONTROL, Keycode.LEFT_ALT, Keycode.U]],          # Button 2
@@ -54,6 +55,9 @@ keymap =    [
              [Keycode.LEFT_CONTROL, Keycode.LEFT_ALT, Keycode.U]]           # Button 3
              ]
 
+
+# The shifted map of keycodes that will be mapped sequentially to each of the keys, 0-15
+# If calling multiple keystrockes, put each sequence as a list in a list
 s_keymap =  [
              [],            # Button C
 
@@ -88,62 +92,93 @@ s_keymap =  [
              []             # Button 3
              ]
 
-"""
-print(keymap2[1])
-print(keys)
-print(Keycode.LEFT_CONTROL)
-"""
-
-# The colour to set the keys when pressed, yellow.
+# The colours to be set by pressing the keys
 l_blue = (0, 255, 255)
 red = (255, 0, 0)
 yellow = (255, 255, 0)
-
-
-shift = False
 
 step_buttons = [3, 7, 11, 15]
 jog_buttons = [1, 4, 5, 9, 12, 13]
 
 jog_enable = False
+shift_enable = True
 
 # Attach handler functions to all of the keys
 for key in keys:
+
     # A press handler that sends the keycode and turns on the LED
 
     @keypad.on_press(key)
     def press_handler(key):
         global jog_enable
+        global timestamp
 
         print("Keynumber:", key.number)
 
         if key.number in step_buttons:
+
+            for button in keys[3::4]:
+                button.led_off()
+
             jog_enable = True
             key.set_led(*yellow)
             print(jog_enable)
+            print(keypad.time_of_last_press)
+
             for entry in keymap[key.number]:    # Used to send multiple Keystrokes
                 keyboard.send(*entry)
                 print("Keynumber:", key.number)
                 print("Typ:", type(keymap[key.number]))
 
+#            timestamp = keypad.time_of_last_press
+
 
         elif key.number in jog_buttons and jog_enable == False:
             key.set_led(*red)
-            print(jog_enable)
+            print("Jog enable:", jog_enable)
+            print("Lastpress:", keypad.time_of_last_press)
+            print("Timestamp:", timestamp)
 
         else:
             keyvalue = keymap[key.number]
             keyboard.send(*keyvalue)
             key.set_led(*l_blue)
-            print("Typ:", type(keymap[key.number]))
-            print(jog_enable)
+#            timestamp = keypad.time_of_last_press
+#            print("Typ:", type(keymap[key.number]))
+            print("Jog enable:", jog_enable)
+            print("Lastpress:", keypad.time_of_last_press)
+            print("Timestamp:", timestamp)
 
     # A release handler that turns off the LED
     @keypad.on_release(key)
     def release_handler(key):
-        key.led_off()
 
+        print(timestamp)
+
+        if key.number not in step_buttons:
+            key.led_off()
+
+keymap = []
 
 while True:
-    # Always remember to call keypad.update()!
+
     keypad.update()
+
+    keypad.led_sleep_enabled = True
+    keypad.led_sleep_time = 5
+
+# Sleeping all led and disbling the jogging buttons
+    if keypad.sleeping:
+        jog_enable = False
+
+# Switching from normal keymap to shifted keymap
+    if keys[0].held:
+        keymap = s_keymap
+    else:
+        keymap = n_keymap
+
+    """
+    if keypad.time_of_last_press > (timestamp + 5):
+        jog_enable = False
+    """
+
